@@ -1,7 +1,20 @@
 [
-  {"Id": 1, "Version": 1, "Order": 1, "Category": "news",
+  {"Id": 1, "Version": 2, "Order": 1, "Category": "news",
    "Title": "Welcome to SteamNet",
    "Brief": "Heat 5 online, over Steam.",
    "Text": "Lobbies, races and voice chat now run over Steam. Leaderboards, World Challenges and eSports come from this server.",
-   "TextAttribution": "", "TextSource": "", "ImageData": null, "ImageAttribution": ""}
+   "TextAttribution": "", "TextSource": "",
+   "ImageUrl": "", "ImageData": null, "ImageAttribution": ""},
+  {"Id": 2, "Version": 1, "Order": 2, "Category": "news",
+   "Title": "News slot 2",
+   "Brief": "Placeholder: put your second story here.",
+   "Text": "Placeholder text for the second news slot.",
+   "TextAttribution": "", "TextSource": "",
+   "ImageUrl": "", "ImageData": null, "ImageAttribution": ""},
+  {"Id": 3, "Version": 1, "Order": 3, "Category": "news",
+   "Title": "News slot 3",
+   "Brief": "Placeholder: put your third story here.",
+   "Text": "Placeholder text for the third news slot.",
+   "TextAttribution": "", "TextSource": "",
+   "ImageUrl": "", "ImageData": null, "ImageAttribution": ""}
 ]

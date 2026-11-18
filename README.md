@@ -46,8 +46,15 @@ Every reply is HTTP 200 with the real status in the `ACTUAL-STATUS-CODE` header:
 network failure. 2020 and 2022 (`/n2020/`, `/n2022/`) keep separate boards.
 
 ## Content files (edit, push, redeploy; they're re-read on every request)
-- `content/news.json`: list of posts `{Id, Version, Order, Title, Brief, Text, Category, ImageData}`. Bump `Version` when you
-  change a post so games fetch it again. `ImageData` = a base64 image, or null.
+- `content/news.json`: list of posts `{Id, Version, Order, Title, Brief, Text, Category, ImageUrl, ImageData}`, one per news
+  slot, shown in `Order` (3 placeholders to start). Bump `Version` when you change a post so games fetch it again.
+  - Picture by link: `"ImageUrl": "https://.../picture.jpg"`. The service downloads it (cached 10 min) and hands it to the
+    game. It must be a direct link to a PNG or JPG (not WebP/GIF, not a web page), under 2 MB. Changing the picture at the
+    same link: bump `Version` too, or use a new link.
+  - Or embed it: `python tools/set_news_image.py <Id> picture.jpg` (sets `ImageData`, bumps `Version`; `none` removes it).
+  - No picture (or a broken link): a plain dark placeholder is sent, because the main menu only shows posts with a picture.
+    `"Placeholder": false` sends none (the post then only shows on the News screen).
+  - A JPG around 1024x512, a few hundred KB, is plenty.
 - `content/tournaments.json`: list of events `{EventId, StartTime, EndTime, adv, RaceLength, WearFactor, DraftEffect, LapCount,
   TrackName, League, PopupMessage}`; `adv` is the series key the game asks for (e.g. `release-CUP`), times are ISO UTC
   (`2026-12-01T00:00:00Z`). Optional `"year": "n2022"` limits an entry to one season (same for challenges).

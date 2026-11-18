@@ -13,13 +13,17 @@ network failure). JSON shapes follow WebAPI.Responses.* in the game's Assembly-C
 Env: PORT (Railway sets it), DATA_DIR (put a Railway volume here; default ./data), CONTENT_DIR (default ./content).
 Run:  pip install -r requirements.txt && python app.py
 """
+import base64
 import json
 import os
 import secrets
 import sqlite3
+import struct
 import time
+import zlib
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 from aiohttp import web
 
 PORT = int(os.getenv("PORT") or "8000")
@@ -301,6 +305,59 @@ async def newsfeed_list(request):
                   "version": [{"Id": n["Id"], "Version": n.get("Version", 1)} for n in items if "Id" in n]})
 
 
+# A post's picture: "ImageData" (base64 PNG/JPG), else "ImageUrl" (downloaded here, cached 10 min), else a plain generated
+# placeholder - the main menu only lists posts whose picture loads. Heat 5 decodes it with Texture2D.LoadImage (PNG/JPG only).
+IMAGE_MAX = 2_000_000
+image_cache = {}  # url -> (time, base64 or None)
+
+
+def is_png_jpg(b):
+    return b[:8] == b"\x89PNG\r\n\x1a\n" or b[:3] == b"\xff\xd8\xff"
+
+
+def placeholder_png(w=512, h=256, rgb=(40, 44, 52)):
+    row = b"\x00" + bytes(rgb) * w
+    chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(row * h, 9)) + chunk(b"IEND", b""))
+
+
+PLACEHOLDER = base64.b64encode(placeholder_png()).decode("ascii")
+
+
+async def fetch_image(url):
+    hit = image_cache.get(url)
+    if hit and now() - hit[0] < 600:
+        return hit[1]
+    data = None
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as s:
+            async with s.get(url, headers={"User-Agent": "NH5Services"}) as r:
+                b = b""
+                async for part in r.content.iter_chunked(65536):
+                    b += part
+                    if len(b) > IMAGE_MAX:
+                        break
+                if r.status == 200 and len(b) <= IMAGE_MAX and is_png_jpg(b):
+                    data = base64.b64encode(b).decode("ascii")
+                else:
+                    print(f"news image {url}: HTTP {r.status}, {len(b)} bytes, " + ("PNG/JPG" if is_png_jpg(b) else "not PNG/JPG"))
+    except Exception as e:
+        print(f"news image {url}: {e}")
+    image_cache[url] = (now(), data)
+    return data
+
+
+async def news_image(n):
+    if n.get("ImageData"):
+        return n["ImageData"]
+    if n.get("ImageUrl"):
+        got = await fetch_image(str(n["ImageUrl"]))
+        if got:
+            return got
+    return PLACEHOLDER if n.get("Placeholder", True) else None
+
+
 async def newsfeed_item(request):
     try:
         nid = int(request.match_info["nid"])
@@ -310,7 +367,7 @@ async def newsfeed_item(request):
         if n.get("Id") == nid:
             post = {"Id": nid, "Version": n.get("Version", 1), "Order": n.get("Order", nid), "Title": n.get("Title", ""),
                     "Brief": n.get("Brief", ""), "Text": n.get("Text", ""), "TextAttribution": n.get("TextAttribution", ""),
-                    "TextSource": n.get("TextSource", ""), "ImageData": n.get("ImageData"),  # base64 PNG/JPG or null
+                    "TextSource": n.get("TextSource", ""), "ImageData": await news_image(n),
                     "ImageAttribution": n.get("ImageAttribution", ""), "Category": n.get("Category", "")}
             return reply({"post": post})
     return error(404, "no such post")
