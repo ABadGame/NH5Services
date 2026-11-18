@@ -204,8 +204,9 @@ async def challenge_list(request):
 
 def challenge_board(year, cid, me):
     rows = db.execute(
-        "SELECT steam_id, MAX(name), MAX(score) AS s FROM challenge_scores WHERE year = ? AND challenge_id = ? "
-        "GROUP BY steam_id ORDER BY s DESC, MIN(t)", (year, cid)).fetchall()
+        # the score is the race time (MGIGameMaster posts GetRaceTimeByCar): fastest first
+        "SELECT steam_id, MAX(name), MIN(score) AS s FROM challenge_scores WHERE year = ? AND challenge_id = ? AND score > 0 "
+        "GROUP BY steam_id ORDER BY s ASC, MIN(t)", (year, cid)).fetchall()
     board = [entry(s, n, v) for s, n, v in rows]
     rank, score = 0, 0.0
     for i, (s, n, v) in enumerate(rows):
